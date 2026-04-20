@@ -43,7 +43,7 @@
 <!-- ═══════════════════════ GAME ═══════════════════════ -->
 <div id="gameCanvas" style="display:none;"></div>
 
-<!-- HUD -->
+<!-- ═══════════════════════ HUD ════════════════════════ -->
 <div id="hud" style="display:none;">
 
   <!-- Lock prompt -->
@@ -55,7 +55,7 @@
     </div>
   </div>
 
-  <!-- Crosshair -->
+  <!-- ── Crosshair ── -->
   <div id="crosshair">
     <div class="ch-top"></div>
     <div class="ch-right"></div>
@@ -64,22 +64,40 @@
     <div class="ch-dot"></div>
   </div>
 
-  <!-- Hit marker (flashes on kill) -->
+  <!-- Hit marker (body shot) -->
   <div id="hitMarker">✕</div>
 
-  <!-- Reload indicator -->
-  <div id="reloadIndicator">RELOADING</div>
+  <!-- ── Kill notify ── -->
+  <div id="killNotify">⊹ KILL ⊹</div>
 
-  <!-- Bottom-left: Health -->
-  <div id="healthPanel">
-    <div class="stat-label">HEALTH</div>
-    <div id="healthBar">
-      <div id="healthFill"></div>
+  <!-- ── Headshot notify ── -->
+  <div id="headshotNotify">★ HEADSHOT ★</div>
+
+  <!-- ── Directional damage indicator ── -->
+  <!-- The outer div is rotated by JS; the arrow always points "up" in local space -->
+  <div id="hitDir">
+    <div class="hit-arrow-ring">
+      <div class="hit-arrow-tip"></div>
     </div>
-    <div id="healthText">100</div>
   </div>
 
-  <!-- Bottom-right: Ammo + KD -->
+  <!-- ── Reload indicator ── -->
+  <div id="reloadIndicator">
+    <span class="reload-label">RELOADING</span>
+    <div id="reloadBarWrap"><div id="reloadBar"></div></div>
+  </div>
+
+  <!-- ── Bottom-left panel: Health + Stamina ── -->
+  <div id="healthPanel">
+    <div class="stat-label">HEALTH</div>
+    <div id="healthBar"><div id="healthFill"></div></div>
+    <div id="healthText">100</div>
+
+    <div class="stat-label stam-label">STAMINA</div>
+    <div id="staminaBar"><div id="staminaFill"></div></div>
+  </div>
+
+  <!-- ── Bottom-right panel: Ammo + K/D ── -->
   <div id="statsPanel">
     <div id="ammo">30 / 30</div>
     <div class="kd-row">
@@ -91,14 +109,20 @@
     </div>
   </div>
 
-  <!-- Top-right: Kill feed -->
+  <!-- ── Top-right: Kill feed ── -->
   <div id="killFeed"></div>
 
-  <!-- Effects overlays -->
+  <!-- ── Top-left: Minimap ── -->
+  <div id="minimapContainer">
+    <canvas id="minimap" width="140" height="140"></canvas>
+    <div class="minimap-label">TACTICAL MAP</div>
+  </div>
+
+  <!-- ── Overlay effects ── -->
   <div id="muzzleFlash"></div>
   <div id="damageFlash"></div>
 
-  <!-- Death screen -->
+  <!-- ── Death screen ── -->
   <div id="deathScreen">
     <div class="death-content">
       <div class="death-title">YOU WERE ELIMINATED</div>
@@ -107,12 +131,13 @@
     </div>
   </div>
 
-  <!-- Scoreboard -->
+  <!-- ── Scoreboard ── -->
   <div id="scoreboard">
-    <div class="sb-title">SCOREBOARD</div>
+    <div class="sb-title">◈ SCOREBOARD ◈</div>
     <table>
       <thead>
         <tr>
+          <th>#</th>
           <th>PLAYER</th>
           <th>K</th>
           <th>D</th>
@@ -123,7 +148,7 @@
     </table>
   </div>
 
-</div>
+</div><!-- #hud -->
 
 <!-- THREE.JS + SOCKET.IO -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>

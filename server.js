@@ -1,43 +1,48 @@
 const express = require('express');
-const http = require('http');
+const http    = require('http');
 const { Server } = require('socket.io');
-const path = require('path');
+const path    = require('path');
 
-const app = express();
+const app    = express();
 const server = http.createServer(app);
-const io = new Server(server, {
+const io     = new Server(server, {
   cors: { origin: '*' },
-  pingTimeout: 10000,
-  pingInterval: 5000,
+  pingTimeout:  10000,
+  pingInterval:  5000,
 });
 
 app.use(express.static(path.join(__dirname, 'public')));
 
 // ─── CONSTANTS ────────────────────────────────────────────────────────────────
-const TICK_RATE    = 20;     // state broadcast Hz
-const MAP_HALF     = 24;     // playable area half-width
-const PLAYER_HP    = 100;
-const BULLET_DMG   = 25;     // 4 shots to kill
-const RESPAWN_MS   = 3000;
-const HIT_RADIUS   = 0.85;   // server-side hitbox radius
+const TICK_RATE   = 20;
+const MAP_HALF    = 24;
+const PLAYER_HP   = 100;
+const BULLET_DMG  = 22;   // body shot (~5 hits)
+const HEADSHOT_DMG= 55;   // headshot (~2 hits)
+const RESPAWN_MS  = 3000;
+const HIT_RADIUS  = 0.82;
 
-// Map obstacles – shared with client (sent on init)
 const OBSTACLES = [
-  { x:  0,   z:  0,   w: 4,   h: 2.5, d: 4   },  // central block
-  { x: -12,  z: -12,  w: 2,   h: 2,   d: 6   },  // NW L-cover
-  { x:  12,  z: -12,  w: 2,   h: 2,   d: 6   },  // NE L-cover
-  { x: -12,  z:  12,  w: 2,   h: 2,   d: 6   },  // SW L-cover
-  { x:  12,  z:  12,  w: 2,   h: 2,   d: 6   },  // SE L-cover
-  { x:  0,   z: -16,  w: 8,   h: 2,   d: 2   },  // N wall
-  { x:  0,   z:  16,  w: 8,   h: 2,   d: 2   },  // S wall
-  { x: -20,  z:  0,   w: 2,   h: 2,   d: 8   },  // W wall
-  { x:  20,  z:  0,   w: 2,   h: 2,   d: 8   },  // E wall
-  { x: -6,   z:  0,   w: 1.5, h: 1.5, d: 1.5 },  // small crates
+  { x:  0,   z:  0,   w: 4,   h: 2.5, d: 4   },
+  { x: -12,  z: -12,  w: 2,   h: 2,   d: 6   },
+  { x:  12,  z: -12,  w: 2,   h: 2,   d: 6   },
+  { x: -12,  z:  12,  w: 2,   h: 2,   d: 6   },
+  { x:  12,  z:  12,  w: 2,   h: 2,   d: 6   },
+  { x:  0,   z: -16,  w: 8,   h: 2,   d: 2   },
+  { x:  0,   z:  16,  w: 8,   h: 2,   d: 2   },
+  { x: -20,  z:  0,   w: 2,   h: 2,   d: 8   },
+  { x:  20,  z:  0,   w: 2,   h: 2,   d: 8   },
+  { x: -6,   z:  0,   w: 1.5, h: 1.5, d: 1.5 },
   { x:  6,   z:  0,   w: 1.5, h: 1.5, d: 1.5 },
   { x:  0,   z: -6,   w: 1.5, h: 1.5, d: 1.5 },
   { x:  0,   z:  6,   w: 1.5, h: 1.5, d: 1.5 },
   { x: -16,  z: -7,   w: 1.5, h: 1.5, d: 1.5 },
   { x:  16,  z:  7,   w: 1.5, h: 1.5, d: 1.5 },
+  // Extra cover
+  { x: -8,   z: -18,  w: 3,   h: 1.5, d: 1.5 },
+  { x:  8,   z:  18,  w: 3,   h: 1.5, d: 1.5 },
+  { x: -18,  z:  8,   w: 1.5, h: 1.5, d: 3   },
+  { x:  18,  z: -8,   w: 1.5, h: 1.5, d: 3   },
 ];
 
 const SPAWN_POINTS = [
@@ -54,7 +59,7 @@ const PLAYER_COLORS = [
 
 // ─── STATE ────────────────────────────────────────────────────────────────────
 const players = new Map();
-let colorIdx = 0;
+let colorIdx  = 0;
 
 // ─── HELPERS ──────────────────────────────────────────────────────────────────
 function randomSpawn() {
@@ -69,20 +74,32 @@ function obsCollides(x, z) {
   return false;
 }
 
-// Sphere-capsule hit test against a cylinder standing at (px, py, pz)
-function rayHitsPlayer(ox, oy, oz, dx, dy, dz, px, py, pz) {
-  // Project ray against cylinder axis (vertical) between y=0 and y=2
-  // simplified: use sphere at chest height
-  const CHY = py + 0.9; // chest y
-  const tx = px - ox;
-  const ty = CHY - oy;
-  const tz = pz - oz;
-  const t = tx * dx + ty * dy + tz * dz;
-  if (t < 0 || t > 80) return false;
-  const ex = ox + dx * t - px;
-  const ey = oy + dy * t - CHY;
-  const ez = oz + dz * t - pz;
-  return (ex * ex + ey * ey + ez * ez) < HIT_RADIUS * HIT_RADIUS;
+/**
+ * Returns { hit: bool, headshot: bool, t: number }
+ * Tests a ray against a player cylinder.
+ */
+function rayVsPlayer(ox, oy, oz, dx, dy, dz, px, py, pz) {
+  // Test two spheres: chest (y+0.9) and head (y+1.75)
+  const tests = [
+    { cy: py + 0.9,  hs: false }, // body
+    { cy: py + 1.75, hs: true  }, // head — smaller radius
+  ];
+  let bestT = Infinity, headshot = false;
+
+  for (const { cy, hs } of tests) {
+    const rad = hs ? 0.28 : HIT_RADIUS;
+    const tx = px - ox, ty = cy - oy, tz = pz - oz;
+    const t  = tx * dx + ty * dy + tz * dz;
+    if (t <= 0 || t > 85) continue;
+    const ex = ox + dx * t - px;
+    const ey = oy + dy * t - cy;
+    const ez = oz + dz * t - pz;
+    if (ex*ex + ey*ey + ez*ez < rad * rad && t < bestT) {
+      bestT = t;
+      headshot = hs;
+    }
+  }
+  return { hit: bestT < Infinity, headshot, t: bestT };
 }
 
 // ─── SOCKET ───────────────────────────────────────────────────────────────────
@@ -104,19 +121,16 @@ io.on('connection', (socket) => {
     };
     players.set(socket.id, p);
 
-    // Send current world to joiner
     socket.emit('init', {
       id:        socket.id,
       players:   [...players.values()],
       obstacles: OBSTACLES,
     });
-
-    // Tell everyone else
     socket.broadcast.emit('playerJoined', p);
     io.emit('killFeed', { msg: `${p.name} joined`, color: p.color });
   });
 
-  // ── Movement ────────────────────────────────────────────────────────────────
+  // ── Movement ─────────────────────────────────────────────────────────────────
   socket.on('move', ({ x, z, rotY }) => {
     const p = players.get(socket.id);
     if (!p || !p.alive) return;
@@ -126,29 +140,41 @@ io.on('connection', (socket) => {
     p.rotY = rotY;
   });
 
-  // ── Shoot ───────────────────────────────────────────────────────────────────
+  // ── Shoot ─────────────────────────────────────────────────────────────────────
   socket.on('shoot', ({ ox, oy, oz, dx, dy, dz }) => {
     const shooter = players.get(socket.id);
     if (!shooter || !shooter.alive) return;
 
-    // Broadcast visual tracer to others
     socket.broadcast.emit('bullet', { ox, oy, oz, dx, dy, dz, sid: socket.id });
 
-    // Hit-scan all other players
-    let hit = null, minT = Infinity;
+    // Hit-scan — find closest target
+    let hit = null, minT = Infinity, isHeadshot = false;
     players.forEach((p) => {
       if (p.id === socket.id || !p.alive) return;
-      const tx = p.x - ox, ty = (p.y + 0.9) - oy, tz = p.z - oz;
-      const t = tx * dx + ty * dy + tz * dz;
-      if (t > 0 && t < minT && rayHitsPlayer(ox, oy, oz, dx, dy, dz, p.x, p.y, p.z)) {
-        hit = p; minT = t;
+      const result = rayVsPlayer(ox, oy, oz, dx, dy, dz, p.x, p.y, p.z);
+      if (result.hit && result.t < minT) {
+        hit = p;
+        minT = result.t;
+        isHeadshot = result.headshot;
       }
     });
 
     if (!hit) return;
 
-    hit.health -= BULLET_DMG;
-    io.to(hit.id).emit('hit', { dmg: BULLET_DMG, health: hit.health, atkId: shooter.id });
+    const dmg = isHeadshot ? HEADSHOT_DMG : BULLET_DMG;
+    hit.health -= dmg;
+
+    io.to(hit.id).emit('hit', {
+      dmg,
+      health:    hit.health,
+      atkId:     shooter.id,
+      atkX:      shooter.x,
+      atkZ:      shooter.z,
+      headshot:  isHeadshot,
+    });
+
+    // Confirm to shooter
+    io.to(shooter.id).emit('shotHit', { headshot: isHeadshot });
 
     if (hit.health <= 0) {
       hit.alive  = false;
@@ -157,13 +183,13 @@ io.on('connection', (socket) => {
 
       io.emit('playerDied', { id: hit.id, killerId: shooter.id });
       io.emit('killFeed', {
-        msg:         `${shooter.name}  ✕  ${hit.name}`,
+        msg:         `${shooter.name}  ✕  ${hit.name}${isHeadshot ? '  ★' : ''}`,
         killerColor: shooter.color,
         victimColor: hit.color,
       });
       io.emit('scoreUpdate', {
-        kId: shooter.id, kills:  shooter.kills,
-        vId: hit.id,     deaths: hit.deaths,
+        kId:    shooter.id, kills:  shooter.kills,
+        vId:    hit.id,     deaths: hit.deaths,
       });
 
       setTimeout(() => {
@@ -178,7 +204,7 @@ io.on('connection', (socket) => {
     }
   });
 
-  // ── Disconnect ──────────────────────────────────────────────────────────────
+  // ── Disconnect ────────────────────────────────────────────────────────────────
   socket.on('disconnect', () => {
     const p = players.get(socket.id);
     if (p) {
@@ -190,12 +216,12 @@ io.on('connection', (socket) => {
   });
 });
 
-// ─── WORLD-STATE BROADCAST LOOP ───────────────────────────────────────────────
+// ─── WORLD-STATE BROADCAST ────────────────────────────────────────────────────
 setInterval(() => {
   if (!players.size) return;
   io.emit('worldState', [...players.values()].map(p => ({
     id:     p.id,
-    x:      p.x,  y:  p.y,  z:  p.z,
+    x:      p.x,   y:  p.y,  z:  p.z,
     rotY:   p.rotY,
     health: p.health,
     alive:  p.alive,
