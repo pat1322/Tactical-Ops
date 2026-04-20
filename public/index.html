@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TACTICAL OPS</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;600;700&family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<!-- ═══════════════════════ MENU ═══════════════════════ -->
+<div id="menu">
+  <div class="menu-bg"></div>
+  <div class="menu-content">
+    <div class="logo">
+      <div class="logo-top">TACTICAL</div>
+      <div class="logo-bottom">OPS</div>
+      <div class="logo-sub">MULTIPLAYER COMBAT</div>
+    </div>
+
+    <div class="menu-form">
+      <label class="field-label">CALLSIGN</label>
+      <input id="playerName" type="text" maxlength="16" placeholder="Enter your name" spellcheck="false" />
+      <button id="playBtn">DEPLOY</button>
+    </div>
+
+    <div class="controls-hint">
+      <div class="hint-title">CONTROLS</div>
+      <div class="hint-grid">
+        <span>WASD</span><span>Move</span>
+        <span>MOUSE</span><span>Aim / Look</span>
+        <span>LMB</span><span>Shoot</span>
+        <span>R</span><span>Reload</span>
+        <span>SHIFT</span><span>Sprint</span>
+        <span>TAB</span><span>Scoreboard</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════ GAME ═══════════════════════ -->
+<div id="gameCanvas" style="display:none;"></div>
+
+<!-- HUD -->
+<div id="hud" style="display:none;">
+
+  <!-- Lock prompt -->
+  <div id="lockPrompt">
+    <div class="lock-box">
+      <div class="lock-icon">⊕</div>
+      <div class="lock-text">CLICK TO CAPTURE MOUSE</div>
+      <div class="lock-sub">Press ESC to release</div>
+    </div>
+  </div>
+
+  <!-- Crosshair -->
+  <div id="crosshair">
+    <div class="ch-top"></div>
+    <div class="ch-right"></div>
+    <div class="ch-bottom"></div>
+    <div class="ch-left"></div>
+    <div class="ch-dot"></div>
+  </div>
+
+  <!-- Hit marker (flashes on kill) -->
+  <div id="hitMarker">✕</div>
+
+  <!-- Reload indicator -->
+  <div id="reloadIndicator">RELOADING</div>
+
+  <!-- Bottom-left: Health -->
+  <div id="healthPanel">
+    <div class="stat-label">HEALTH</div>
+    <div id="healthBar">
+      <div id="healthFill"></div>
+    </div>
+    <div id="healthText">100</div>
+  </div>
+
+  <!-- Bottom-right: Ammo + KD -->
+  <div id="statsPanel">
+    <div id="ammo">30 / 30</div>
+    <div class="kd-row">
+      <span class="kd-label">K</span>
+      <span id="kills">0</span>
+      <span class="kd-sep">|</span>
+      <span class="kd-label">D</span>
+      <span id="deaths">0</span>
+    </div>
+  </div>
+
+  <!-- Top-right: Kill feed -->
+  <div id="killFeed"></div>
+
+  <!-- Effects overlays -->
+  <div id="muzzleFlash"></div>
+  <div id="damageFlash"></div>
+
+  <!-- Death screen -->
+  <div id="deathScreen">
+    <div class="death-content">
+      <div class="death-title">YOU WERE ELIMINATED</div>
+      <div class="death-killer">by <span id="killerName">Unknown</span></div>
+      <div class="death-timer">Respawning in <span id="respawnTimer">3</span>s</div>
+    </div>
+  </div>
+
+  <!-- Scoreboard -->
+  <div id="scoreboard">
+    <div class="sb-title">SCOREBOARD</div>
+    <table>
+      <thead>
+        <tr>
+          <th>PLAYER</th>
+          <th>K</th>
+          <th>D</th>
+          <th>K/D</th>
+        </tr>
+      </thead>
+      <tbody id="scoreboardBody"></tbody>
+    </table>
+  </div>
+
+</div>
+
+<!-- THREE.JS + SOCKET.IO -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="/socket.io/socket.io.js"></script>
+<script src="game.js"></script>
+</body>
+</html>
